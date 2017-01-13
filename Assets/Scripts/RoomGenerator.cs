@@ -154,8 +154,8 @@ public class RoomGenerator : MonoBehaviour
                 line.transform.parent = LinesContainer.transform;
             }
 
-            if (!MainRooms[DelaunayTriangulation[n].p0.Value].Connections.Contains(DelaunayTriangulation[n].p1.Value))
-                MainRooms[DelaunayTriangulation[n].p0.Value].Connections.Add(DelaunayTriangulation[n].p1.Value);
+            if (!MainRooms[DelaunayTriangulation[value].p0.Value].Connections.Contains(DelaunayTriangulation[value].p1.Value))
+                MainRooms[DelaunayTriangulation[value].p0.Value].Connections.Add(DelaunayTriangulation[value].p1.Value);
         }
     }
 
