@@ -63,7 +63,7 @@ public class RoomGenerator : MonoBehaviour
 
         for (int n = 0; n < Rooms.Count; n++)
         {
-            if (Rooms[n].transform.localScale.x >= (1f + mainRoomFrequency) * widthAvg && Rooms[n].transform.localScale.y >= (1f + mainRoomFrequency) * heightAvg)
+            if (Rooms[n].transform.localScale.x >= (2.35f - mainRoomFrequency) * widthAvg && Rooms[n].transform.localScale.y >=  (2.35f - mainRoomFrequency) * heightAvg)
             {
                 Rooms[n].SetMain();
             }
