@@ -346,8 +346,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   RoomCount: 300
   Radius: 40
-  MainRoomFrequency: 1.1
-  RoomConnectionFrequency: 0.2
+  MainRoomFrequency: 0.25
+  RoomConnectionFrequency: 0.11
 --- !u!4 &1103685164
 Transform:
   m_ObjectHideFlags: 0

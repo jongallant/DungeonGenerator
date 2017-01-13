@@ -21,7 +21,7 @@ public class DungeonGenerator : MonoBehaviour
     int Radius = 50;
 
     [SerializeField]
-    [Range(0, 2)]
+    [Range(0, 1)]
     float MainRoomFrequency = 0.25f;
 
     [SerializeField]
