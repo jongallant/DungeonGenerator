@@ -1,8 +1,8 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 
-public class Room : MonoBehaviour {
-    
+public class Room : MonoBehaviour
+{
     public int ID
     {
         get;
@@ -31,8 +31,9 @@ public class Room : MonoBehaviour {
     SpriteRenderer Background;
     public Rigidbody2D RigidBody2D;
     public Vector3 Center
-    { 
-		get {
+    {
+        get
+        {
             return transform.position;
         }
     }
@@ -50,7 +51,7 @@ public class Room : MonoBehaviour {
             return new Vector3(transform.position.x + transform.localScale.x / 2f, transform.position.y - transform.localScale.y / 2f);
         }
     }
-    
+
     public List<Vector2> Connections = new List<Vector2>();
 
     void Awake()
@@ -63,7 +64,7 @@ public class Room : MonoBehaviour {
 
     public void Init(int id, Vector2 position, int width, int height)
     {
-		ID = id;
+        ID = id;
 
         transform.position = position;
         transform.localScale = new Vector2(width, height);
@@ -72,7 +73,7 @@ public class Room : MonoBehaviour {
 
     public void SetMain()
     {
-        IsMainRoom = true;       
+        IsMainRoom = true;
     }
 
     public void SetLocked(bool locked)
@@ -95,7 +96,8 @@ public class Room : MonoBehaviour {
 
     void FixedUpdate()
     {
-        if (!IsLocked) {
+        if (!IsLocked)
+        {
             Snap();
         }
     }
@@ -114,5 +116,5 @@ public class Room : MonoBehaviour {
             Background.color = DisabledColor;
         }
     }
-	
+
 }
