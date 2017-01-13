@@ -22,7 +22,6 @@ public class RoomGenerator : MonoBehaviour
     int[] Distribution = new int[] { 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 7, 8, 10, 12, 14 };
 
     private List<Vector2> Points = new List<Vector2>();
-    private List<LineSegment> Edges = null;
     private List<LineSegment> SpanningTree;
     private List<LineSegment> DelaunayTriangulation;
 
@@ -302,7 +301,6 @@ public class RoomGenerator : MonoBehaviour
 
         //Calculate min spanning tree
         Voronoi v = new Voronoi(Points, colors, new Rect(0, 0, 50, 50));
-        Edges = v.VoronoiDiagram();
         SpanningTree = v.SpanningTree(KruskalType.MINIMUM);
         DelaunayTriangulation = v.DelaunayTriangulation();
 
