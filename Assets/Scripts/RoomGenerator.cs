@@ -8,6 +8,33 @@ public class RoomGenerator : MonoBehaviour
     public delegate void RoomsGeneratedHandler();
     public event RoomsGeneratedHandler OnRoomsGenerated;
 
+    public float XMin
+    {
+        get;
+        private set;
+    }
+    public float XMax
+    {
+        get;
+        private set;
+    }
+    public float YMin
+    {
+        get;
+        private set;
+    }
+    public float YMax
+    {
+        get;
+        private set;
+    }
+
+    public bool IsValid
+    {
+        get;
+        private set;
+    }
+
     GameObject RoomsContainer;
     GameObject LinesContainer;
 
@@ -19,6 +46,8 @@ public class RoomGenerator : MonoBehaviour
     Dictionary<Vector2, Room> MainRooms;
 
     bool Done = false;
+
+    //Room size distribution
     int[] Distribution = new int[] { 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 7, 8, 10, 12, 14 };
 
     private List<Vector2> Points = new List<Vector2>();
@@ -26,7 +55,8 @@ public class RoomGenerator : MonoBehaviour
     private List<LineSegment> DelaunayTriangulation;
 
     private float RoomConnectionFrequency = 0.15f;
-    public List<LineSegment> Lines;
+
+    Dictionary<Room, int> ConnectionCounter = new Dictionary<Room, int>();
 
     public void Generate(int roomCount, int radius, float mainRoomFrequency, float roomConnectionFrequency)
     {
@@ -82,11 +112,10 @@ public class RoomGenerator : MonoBehaviour
 
     void Update()
     {
-
         bool allSleeping = true;
         for (int n = 0; n < Rooms.Count; n++)
         {
-            if (!Rooms[n].RigidBody2D.IsSleeping())
+            if (!Rooms[n].IsSleeping)
             {
                 allSleeping = false;
                 Rooms[n].SetLocked(false);
@@ -105,6 +134,7 @@ public class RoomGenerator : MonoBehaviour
         }
     }
 
+    //Create the smallest path possible between all our main rooms
     private void GenerateSpanningTree(bool drawLines)
     {
         for (int n = 0; n < SpanningTree.Count; n++)
@@ -116,12 +146,21 @@ public class RoomGenerator : MonoBehaviour
                 line.GetComponent<LineRenderer>().SetPosition(1, SpanningTree[n].p1.Value);
                 line.GetComponent<LineRenderer>().sortingOrder = 100;
                 line.GetComponent<LineRenderer>().SetColors(Color.red, Color.red);
-
                 line.transform.parent = LinesContainer.transform;
             }
 
-            if (!MainRooms[SpanningTree[n].p0.Value].Connections.Contains(SpanningTree[n].p1.Value))
-                MainRooms[SpanningTree[n].p0.Value].Connections.Add(SpanningTree[n].p1.Value);
+            //Create an index so we can keep track of the actual connections count of each main room
+            if (!ConnectionCounter.ContainsKey(MainRooms[SpanningTree[n].p0.Value]))
+                ConnectionCounter.Add(MainRooms[SpanningTree[n].p0.Value], 0);
+            if (!ConnectionCounter.ContainsKey(MainRooms[SpanningTree[n].p1.Value]))
+                ConnectionCounter.Add(MainRooms[SpanningTree[n].p1.Value], 0);
+
+            //increment the counter
+            ConnectionCounter[MainRooms[SpanningTree[n].p0.Value]]++;
+            ConnectionCounter[MainRooms[SpanningTree[n].p1.Value]]++;
+
+            //Add the room connection to the Room object
+            MainRooms[SpanningTree[n].p0.Value].AddRoomConnection(CreateRoomConnection(SpanningTree[n].p0.Value, SpanningTree[n].p1.Value));
         }
 
         AddExtraConnections(drawLines);
@@ -153,12 +192,61 @@ public class RoomGenerator : MonoBehaviour
                 line.transform.parent = LinesContainer.transform;
             }
 
-            if (!MainRooms[DelaunayTriangulation[value].p0.Value].Connections.Contains(DelaunayTriangulation[value].p1.Value))
-                MainRooms[DelaunayTriangulation[value].p0.Value].Connections.Add(DelaunayTriangulation[value].p1.Value);
+            //Create an index so we can keep track of the actual connections count of each main room
+            if (!ConnectionCounter.ContainsKey(MainRooms[DelaunayTriangulation[value].p0.Value]))
+                ConnectionCounter.Add(MainRooms[DelaunayTriangulation[value].p0.Value], 0);
+            if (!ConnectionCounter.ContainsKey(MainRooms[DelaunayTriangulation[value].p1.Value]))
+                ConnectionCounter.Add(MainRooms[DelaunayTriangulation[value].p1.Value], 0);
+
+            //increment the counter
+            ConnectionCounter[MainRooms[DelaunayTriangulation[value].p0.Value]]++;
+            ConnectionCounter[MainRooms[DelaunayTriangulation[value].p1.Value]]++;
+
+
+            MainRooms[DelaunayTriangulation[value].p0.Value].AddRoomConnection(CreateRoomConnection(DelaunayTriangulation[value].p0.Value, DelaunayTriangulation[value].p1.Value));
         }
     }
 
-    private void GenerateRoomConnections(bool drawLines)
+    private RoomConnection CreateRoomConnection(Vector2 p0, Vector2 p1)
+    {
+
+        //Create the room connection
+        Room room = MainRooms[p1];
+
+        //Determine the direction of the connection
+        ConnectionType direction = ConnectionType.Up;
+
+        float xdiff = Mathf.Abs(p0.x - p1.x);
+        float ydiff = Mathf.Abs(p0.y - p1.y);
+
+        if (xdiff > ydiff)
+        {
+            if (p0.x > p1.x)
+            {
+                direction = ConnectionType.Left;
+            }
+            else
+            {
+                direction = ConnectionType.Right;
+            }
+        }
+        else
+        {
+            if (p0.y > p1.y)
+            {
+                direction = ConnectionType.Down;
+            }
+            else
+            {
+                direction = ConnectionType.Up;
+            }
+        }
+
+        return new RoomConnection(room, direction);
+    }
+
+    //Create the lines between main rooms and find secondary rooms
+    private void ProcessRoomConnections(bool drawLines)
     {
         for (int n = 0; n < Rooms.Count; n++)
         {
@@ -173,111 +261,131 @@ public class RoomGenerator : MonoBehaviour
 
                 for (int i = 0; i < Rooms[n].Connections.Count; i++)
                 {
+                    Room connectingRoom = Rooms[n].Connections[i].Room;
+                    ConnectionType direction = Rooms[n].Connections[i].Direction;
+
+                    //Get line points
                     Vector2 p0 = Rooms[n].Center;
-                    Vector2 p1 = Rooms[n].Connections[i];
+                    Vector2 p1 = connectingRoom.Center;
+                    Vector2 p2 = Vector2.zero;
+                    Vector2 p3 = Vector2.zero;
 
-                    float xdiff = Mathf.Abs(p0.x - p1.x);
-                    float ydiff = Mathf.Abs(p0.y - p1.y);
-
-                    if (Rooms[n].Center.y < Rooms[n].Connections[i].y)
+                    if (direction == ConnectionType.Up)
                     {
-                        if (drawLines)
+                        p2 = new Vector2(p0.x, p1.y);
+                        p3 = p2;
+                        //Hallways are off by 3 pixels in this direction only.  Not sure why.
+                        //Adjust by 3 units
+                        if (p0.x > p1.x)
                         {
-                            GameObject line = GameObject.Instantiate(Resources.Load("Line") as GameObject);
-                            line.GetComponent<LineRenderer>().SetPosition(0, Rooms[n].Center);
-                            line.GetComponent<LineRenderer>().SetPosition(1, new Vector2(Rooms[n].Center.x, Rooms[n].Connections[i].y + 3));
-                            line.GetComponent<LineRenderer>().sortingOrder = 100;
-
-                            line.transform.parent = LinesContainer.transform;
+                            p3 = new Vector2(p0.x, p1.y + 3);
                         }
-
-                        Lines.Add(new LineSegment(Rooms[n].Center, new Vector2(Rooms[n].Center.x, Rooms[n].Connections[i].y + 3)));
                     }
-                    else
+                    else if (direction == ConnectionType.Right)
                     {
-                        if (drawLines)
-                        {
-                            GameObject line = GameObject.Instantiate(Resources.Load("Line") as GameObject);
-                            line.GetComponent<LineRenderer>().SetPosition(0, Rooms[n].Center);
-                            line.GetComponent<LineRenderer>().SetPosition(1, new Vector2(Rooms[n].Center.x, Rooms[n].Connections[i].y - 3));
-                            line.GetComponent<LineRenderer>().sortingOrder = 100;
-
-                            line.transform.parent = LinesContainer.transform;
-                        }
-
-                        Lines.Add(new LineSegment(Rooms[n].Center, new Vector2(Rooms[n].Center.x, Rooms[n].Connections[i].y - 3)));
+                        p2 = new Vector2(p1.x, p0.y);
+                        p3 = p2;
+                    }
+                    else if (direction == ConnectionType.Down)
+                    {
+                        p2 = new Vector2(p0.x, p1.y);
+                        p3 = p2;
+                    }
+                    else if (direction == ConnectionType.Left)
+                    {
+                        p2 = new Vector2(p1.x, p0.y);
+                        p3 = p2;
                     }
 
-                    //Activate all rooms that intersect the lines we create
-                    RaycastHit2D[] hit = Physics2D.LinecastAll(Rooms[n].Center, new Vector2(Rooms[n].Center.x, Rooms[n].Connections[i].y));
+                    //LineCast for collisions.  Hit objects will become secondary rooms.
+                    RaycastHit2D[] hit = Physics2D.LinecastAll(p0, p2);
                     for (int x = 0; x < hit.Length; x++)
                     {
                         hit[x].collider.GetComponent<Room>().SetVisible(true);
                     }
 
-                    if (drawLines)
-                    {
-                        GameObject line = GameObject.Instantiate(Resources.Load("Line") as GameObject);
-                        line.GetComponent<LineRenderer>().SetPosition(0, new Vector2(Rooms[n].Center.x, Rooms[n].Connections[i].y));
-                        line.GetComponent<LineRenderer>().SetPosition(1, new Vector2(Rooms[n].Connections[i].x, Rooms[n].Connections[i].y));
-                        line.GetComponent<LineRenderer>().sortingOrder = 100;
-
-                        line.transform.parent = LinesContainer.transform;
-                    }
-
-                    hit = Physics2D.LinecastAll(new Vector2(Rooms[n].Center.x, Rooms[n].Connections[i].y), new Vector2(Rooms[n].Connections[i].x, Rooms[n].Connections[i].y));
+                    hit = Physics2D.LinecastAll(p2, p1);
                     for (int x = 0; x < hit.Length; x++)
                     {
                         hit[x].collider.GetComponent<Room>().SetVisible(true);
                     }
 
-                    Lines.Add(new LineSegment(new Vector2(Rooms[n].Center.x, Rooms[n].Connections[i].y), new Vector2(Rooms[n].Connections[i].x, Rooms[n].Connections[i].y)));
-
-
-                    if (xdiff < 5)
-                    {
-                        if (drawLines)
-                        {
-                            GameObject line = GameObject.Instantiate(Resources.Load("Line") as GameObject);
-                            line.GetComponent<LineRenderer>().SetPosition(0, Rooms[n].Center);
-                            line.GetComponent<LineRenderer>().SetPosition(1, new Vector2(Rooms[n].Center.x, Rooms[n].Connections[i].y));
-                            line.GetComponent<LineRenderer>().sortingOrder = 100;
-
-                            line.transform.parent = LinesContainer.transform;
-                        }
-
-                        hit = Physics2D.LinecastAll(Rooms[n].Center, new Vector2(Rooms[n].Center.x, Rooms[n].Connections[i].y));
-                        for (int x = 0; x < hit.Length; x++)
-                        {
-                            hit[x].collider.GetComponent<Room>().SetVisible(true);
-                        }
-
-                        Lines.Add(new LineSegment(Rooms[n].Center, new Vector2(Rooms[n].Center.x, Rooms[n].Connections[i].y)));
-                    }
-
-
-                    if (ydiff < 5)
-                    {
-                        if (drawLines)
-                        {
-                            GameObject line = GameObject.Instantiate(Resources.Load("Line") as GameObject);
-                            line.GetComponent<LineRenderer>().SetPosition(0, Rooms[n].Center);
-                            line.GetComponent<LineRenderer>().SetPosition(1, new Vector2(Rooms[n].Connections[i].x, Rooms[n].Center.y));
-                            line.GetComponent<LineRenderer>().sortingOrder = 100;
-
-                            line.transform.parent = LinesContainer.transform;
-                        }
-
-                        hit = Physics2D.LinecastAll(Rooms[n].Center, new Vector2(Rooms[n].Connections[i].x, Rooms[n].Center.y));
-                        for (int x = 0; x < hit.Length; x++)
-                        {
-                            hit[x].collider.GetComponent<Room>().SetVisible(true);
-                        }
-
-                        Lines.Add(new LineSegment(Rooms[n].Center, new Vector2(Rooms[n].Connections[i].x, Rooms[n].Center.y)));
-                    }
+                    //Store lines 
+                    Rooms[n].Connections[i].Line1 = new LineSegment(p0, p3);
+                    Rooms[n].Connections[i].Line2 = new LineSegment(p2, p1);
                 }
             }
+        }
+    }
+
+    private void SetStartAndEndRooms()
+    {
+
+        List<Room> roomsWithOneConnection = new List<Room>();
+        List<Room> roomsWithTwoConnection = new List<Room>();
+
+        //check connection counters
+        foreach (KeyValuePair<Room, int> kvp in ConnectionCounter)
+        {
+            if (kvp.Value == 1)
+            {
+                roomsWithOneConnection.Add(kvp.Key);
+            }
+            if (kvp.Value == 2)
+            {
+                roomsWithTwoConnection.Add(kvp.Key);
+            }
+        }
+
+        Room start = null;
+        Room end = null;
+        float distance = 0;
+
+        //attempt to grab start room
+        if (roomsWithOneConnection.Count >= 1)
+        {
+            start = roomsWithOneConnection[0];
+            roomsWithOneConnection.RemoveAt(0);
+        }
+        else if (roomsWithTwoConnection.Count > 1)
+        {
+            start = roomsWithTwoConnection[0];
+            roomsWithTwoConnection.RemoveAt(0);
+        }
+
+        //attempt to grab end room
+        if (start != null)
+        {
+            for (int n = 0; n < roomsWithOneConnection.Count; n++)
+            {
+                float d = (roomsWithOneConnection[n].Center - start.Center).magnitude;
+                if (d > distance)
+                {
+                    distance = d;
+                    end = roomsWithOneConnection[n];
+                }
+            }
+            for (int n = 0; n < roomsWithTwoConnection.Count; n++)
+            {
+                float d = (roomsWithTwoConnection[n].Center - start.Center).magnitude;
+                if (d > distance)
+                {
+                    distance = d;
+                    end = roomsWithTwoConnection[n];
+                }
+            }
+        }
+
+        //if both start and end are found, set them
+        if (start != null && end != null)
+        {
+            start.SetStartRoom();
+            end.SetEndRoom();
+            IsValid = true;
+        }
+        else
+        {
+            IsValid = false;
         }
     }
 
@@ -304,15 +412,44 @@ public class RoomGenerator : MonoBehaviour
         SpanningTree = v.SpanningTree(KruskalType.MINIMUM);
         DelaunayTriangulation = v.DelaunayTriangulation();
 
-        Lines = new List<LineSegment>();
-
         //Add room connections
         GenerateSpanningTree(true);
-        GenerateRoomConnections(false);
+        ProcessRoomConnections(false);
+
+        SetStartAndEndRooms();
+
+        //Calculate boundaries
+        XMin = float.MaxValue;
+        YMin = float.MaxValue;
+        XMax = float.MinValue;
+        YMax = float.MinValue;
+
+        for (int n = 0; n < Rooms.Count; n++)
+        {
+            if (Rooms[n].IsVisible)
+            {
+                XMin = Mathf.Min(XMin, Rooms[n].TopLeft.x);
+                XMax = Mathf.Max(XMax, Rooms[n].BottomRight.x);
+                YMin = Mathf.Min(YMin, Rooms[n].BottomRight.y);
+                YMax = Mathf.Max(YMax, Rooms[n].TopLeft.y);
+            }
+        }
 
         OnRoomsGenerated();
     }
 
+    public void ClearData()
+    {
+
+        for (int n = 0; n < Rooms.Count; n++)
+        {
+            GameObject.Destroy(Rooms[n].gameObject);
+        }
+        Rooms.Clear();
+
+        GameObject.Destroy(LinesContainer);
+        GameObject.Destroy(RoomsContainer);
+    }
 }
 
 

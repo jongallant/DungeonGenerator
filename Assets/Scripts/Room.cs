@@ -23,13 +23,24 @@ public class Room : MonoBehaviour
         get;
         private set;
     }
+    public bool IsSleeping
+    {
+        get
+        {
+            return RigidBody2D.IsSleeping();
+        }
+    }
+    public bool IsStartRoom
+    {
+        get;
+        private set;
+    }
+    public bool IsEndRoom
+    {
+        get;
+        private set;
+    }
 
-    Color SecondaryColor = new Color(0.8f, 0.8f, 0.8f);
-    Color MainColor = new Color(200f / 255f, 150f / 255f, 65 / 255f);
-    Color DisabledColor = new Color(0.2f, 0.2f, 0.2f, 0.5f);
-
-    SpriteRenderer Background;
-    public Rigidbody2D RigidBody2D;
     public Vector3 Center
     {
         get
@@ -52,12 +63,28 @@ public class Room : MonoBehaviour
         }
     }
 
-    public List<Vector2> Connections = new List<Vector2>();
+    Color SecondaryColor = new Color(0.8f, 0.8f, 0.8f);
+    Color MainColor = new Color(200f / 255f, 150f / 255f, 65 / 255f);
+    Color DisabledColor = new Color(0.2f, 0.2f, 0.2f, 0.5f);
+
+    Color StartRoomColor = new Color(90 / 255f, 195 / 255f, 90 / 255f);
+    Color EndRoomColor = new Color(195 / 255f, 85 / 255f, 165 / 255f);
+
+    SpriteRenderer Background;
+    Rigidbody2D RigidBody2D;
+
+    public List<RoomConnection> Connections
+    {
+        get;
+        private set;
+    }
 
     void Awake()
     {
         Background = GetComponent<SpriteRenderer>();
         RigidBody2D = GetComponent<Rigidbody2D>();
+
+        Connections = new List<RoomConnection>();
 
         IsVisible = true;
     }
@@ -68,7 +95,6 @@ public class Room : MonoBehaviour
 
         transform.position = position;
         transform.localScale = new Vector2(width, height);
-
     }
 
     public void SetMain()
@@ -84,6 +110,24 @@ public class Room : MonoBehaviour
     public void SetVisible(bool visible)
     {
         IsVisible = visible;
+    }
+
+    public void SetStartRoom()
+    {
+        IsStartRoom = true;
+    }
+
+    public void SetEndRoom()
+    {
+        IsEndRoom = true;
+    }
+
+    public void AddRoomConnection(RoomConnection connection)
+    {
+        if (!Connections.Contains(connection))
+        {
+            Connections.Add(connection);
+        }
     }
 
     public void Snap()
@@ -107,7 +151,14 @@ public class Room : MonoBehaviour
         if (IsVisible)
         {
             if (IsMainRoom)
-                Background.color = MainColor;
+            {
+                if (IsStartRoom)
+                    Background.color = StartRoomColor;
+                else if (IsEndRoom)
+                    Background.color = EndRoomColor;
+                else
+                    Background.color = MainColor;
+            }
             else
                 Background.color = SecondaryColor;
         }
